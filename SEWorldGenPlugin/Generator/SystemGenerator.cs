@@ -24,6 +24,8 @@ namespace SEWorldGenPlugin.Generator
 
         private const string STORAGE_FILE = "SystemData.xml";
 
+        private List<string> vanilla_planets = new List<string> { "EarthLike", "Mars", "Triton", "Alien", "Europa", "Titan", "Moon" };
+
         public HashSet<MySystemItem> m_objects
         {
             get;
@@ -49,6 +51,19 @@ namespace SEWorldGenPlugin.Generator
         }
 
         public List<MyPlanetGeneratorDefinition> m_gasGiants
+        {
+            get;
+            private set;
+        }
+
+        public List<MyPlanetGeneratorDefinition> m_availablePlanets
+        {
+            get;
+            private set;
+        }
+
+
+        public List<MyPlanetGeneratorDefinition> m_availableMoons
         {
             get;
             private set;
@@ -99,6 +114,8 @@ namespace SEWorldGenPlugin.Generator
             m_mandatoryPlanets = new List<MyPlanetGeneratorDefinition>();
             m_moonDefinitions = new List<MyPlanetGeneratorDefinition>();
             m_gasGiants = new List<MyPlanetGeneratorDefinition>();
+            m_availableMoons = new List<MyPlanetGeneratorDefinition>();
+            m_availablePlanets = new List<MyPlanetGeneratorDefinition>();
             FilterDefinitions();
         }
 
@@ -163,7 +180,7 @@ namespace SEWorldGenPlugin.Generator
                     }
 
 
-                    if(MyRandom.Instance.NextDouble()/* * ((i % 6) * (i % 6) / 12.5)*/ < 1 - m_settings.BeltSettings.BeltProbability && m_planetDefinitions.Count != 0){
+                    if(MyRandom.Instance.NextDouble()/* * ((i % 6) * (i % 6) / 12.5)*/ < 1 - m_settings.BeltSettings.BeltProbability && m_planetDefinitions.Count > 0){
                         GeneratePlanet(i, tmp_distance, numberPlanets, ref totalPlanets);
                     }
                     else
@@ -171,6 +188,8 @@ namespace SEWorldGenPlugin.Generator
                         GenerateBelt(tmp_distance, ref totalBelts);
                     }
                 }
+
+                if (SettingsSession.Static.Settings.GeneratorSettings.PlanetsOnlyOnce) return;
 
                 if(m_mandatoryPlanets.Count != 0)
                 {
@@ -275,6 +294,8 @@ namespace SEWorldGenPlugin.Generator
             return ring;
         }
 
+        bool m_usedAllPlanets = false;
+
         private MyPlanetGeneratorDefinition GetPlanetDefinition(float maximumSize, bool ignoreMandatory = false)
         {
             int tries = 0;
@@ -285,19 +306,33 @@ namespace SEWorldGenPlugin.Generator
             {
                 def = m_mandatoryPlanets[0];
                 m_mandatoryPlanets.RemoveAt(0);
-                return def;
             }
-
-            do
+            else
             {
-                def = m_planetDefinitions[MyRandom.Instance.Next(0, m_planetDefinitions.Count - 1)];
-                size = SizeByGravity(def.SurfaceGravity);
-                tries++;
+                do
+                {
+                    def = m_availablePlanets[MyRandom.Instance.Next(0, m_availablePlanets.Count - 1)];
+                    size = SizeByGravity(def.SurfaceGravity);
+                    tries++;
 
-            } while (size > maximumSize && tries < 10000);
+                } while (size > maximumSize && tries < 10000);
+            }
+            
+
+            if (SettingsSession.Static.Settings.GeneratorSettings.PlanetsOnlyOnce && !m_usedAllPlanets)
+            {
+                m_availablePlanets.Remove(def);
+                if(m_availablePlanets.Count <= 0)
+                {
+                    m_availablePlanets = m_planetDefinitions;
+                    m_usedAllPlanets = true;
+                }
+            }
 
             return def;
         }
+
+        bool m_usedAllMoons = false;
 
         private MyPlanetGeneratorDefinition GetPlanetMoonDefinition(float maximumSize)
         {
@@ -309,12 +344,22 @@ namespace SEWorldGenPlugin.Generator
 
             do
             {
-                def = m_moonDefinitions[MyRandom.Instance.Next(0, (m_moonDefinitions.Count - 1) * 2) % m_moonDefinitions.Count];
+                def = m_availableMoons[MyRandom.Instance.Next(0, (m_availableMoons.Count - 1) * 2) % m_availableMoons.Count];
 
                 size = SizeByGravity(def.SurfaceGravity);
                 tries++;
 
             } while (size >= maximumSize && tries < 10000);
+
+            if (SettingsSession.Static.Settings.GeneratorSettings.MoonsOnlyOnce && !m_usedAllMoons)
+            {
+                m_availableMoons.Remove(def);
+                if (m_availableMoons.Count <= 0)
+                {
+                    m_availableMoons = m_moonDefinitions;
+                    m_usedAllMoons = true;
+                }
+            }
 
             return def;
         }
@@ -357,6 +402,11 @@ namespace SEWorldGenPlugin.Generator
                     toRemovePlanets.Add(p);
                     continue;
                 }
+                if (!SettingsSession.Static.Settings.GeneratorSettings.UseVanillaPlanets && vanilla_planets.Contains(p.Id.SubtypeId.String))
+                {
+                    toRemovePlanets.Add(p);
+                    continue;
+                }
                 if (SettingsSession.Static.Settings.GeneratorSettings.PlanetSettings.BlacklistedPlanets.Contains(p.Id.SubtypeId.String))
                 {
                     toRemovePlanets.Add(p);
@@ -365,6 +415,7 @@ namespace SEWorldGenPlugin.Generator
                 {
                     toRemovePlanets.Add(p);
                     m_moonDefinitions.Add(p);
+                    m_availableMoons.Add(p);
                 }
                 if (SettingsSession.Static.Settings.GeneratorSettings.PlanetSettings.MandatoryPlanets.Contains(p.Id.SubtypeId.String) || SettingsSession.Static.Settings.GeneratorSettings.SemiRandomizedGeneration)
                 {
@@ -379,6 +430,11 @@ namespace SEWorldGenPlugin.Generator
             foreach(var r in toRemovePlanets)
             {
                 m_planetDefinitions.Remove(r);
+            }
+
+            foreach(var p in m_planetDefinitions)
+            {
+                m_availablePlanets.Add(p);
             }
 
             ShuffleMandatoryPlanets();
