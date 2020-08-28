@@ -211,7 +211,15 @@ namespace SEWorldGenPlugin.Generator
         {
             MySystemBeltItem belt = new MySystemBeltItem();
 
-            belt.DisplayName = "Belt " + greek_letters[beltIndex++ % greek_letters.Length];
+            string name = SettingsSession.Static.Settings.GeneratorSettings.BeltSettings.BeltNameFormat
+                .SetProperty("ObjectNumber", beltIndex + 1)
+                .SetProperty("ObjectNumberGreek", greek_letters[beltIndex])
+                .SetProperty("ObjectLetterLower", (char)('a' + (beltIndex % 26)))
+                .SetProperty("ObjectLetterUpper", (char)('A' + (beltIndex % 26)));
+
+            ++beltIndex;
+
+            belt.DisplayName = name;
             belt.Type = SystemObjectType.BELT;
             belt.Height = MyRandom.Instance.Next(m_settings.BeltSettings.MinBeltHeight, m_settings.BeltSettings.MaxBeltHeight);
             belt.Radius = distance;
@@ -236,9 +244,13 @@ namespace SEWorldGenPlugin.Generator
             Vector3D pos = new Vector3D(distance * Math.Sin(angle), distance * Math.Cos(angle), distance * Math.Sin(height));
 
             string name = SettingsSession.Static.Settings.GeneratorSettings.PlanetSettings.PlanetNameFormat
-                .SetProperty("ObjectNumber", ++planetIndex)
+                .SetProperty("ObjectNumber", planetIndex + 1)
                 .SetProperty("ObjectNumberGreek", greek_letters[planetIndex])
+                .SetProperty("ObjectLetterLower", (char)('a' + (planetIndex % 26)))
+                .SetProperty("ObjectLetterUpper", (char)('A' + (planetIndex % 26)))
                 .SetProperty("ObjectId", def.Id.SubtypeId.String);
+
+            ++planetIndex;
 
             planet.DisplayName = name;
             planet.Type = SystemObjectType.PLANET;
@@ -269,10 +281,13 @@ namespace SEWorldGenPlugin.Generator
 
                 if (dist + distance > m_settings.WorldSize && m_settings.WorldSize > 0) return moons;
 
-                string name = SettingsSession.Static.Settings.GeneratorSettings.PlanetSettings.PlanetNameFormat
-                .SetProperty("ObjectNumber", i)
+                string name = SettingsSession.Static.Settings.GeneratorSettings.PlanetSettings.MoonNameFormat
+                .SetProperty("ObjectNumber", i + 1)
                 .SetProperty("ObjectNumberGreek", greek_letters[i])
-                .SetProperty("ObjectId", def.Id.SubtypeId.String);
+                .SetProperty("ObjectLetterLower", (char)('a' + (i % 26)))
+                .SetProperty("ObjectLetterUpper", (char)('A' + (i % 26)))
+                .SetProperty("ObjectId", def.Id.SubtypeId.String)
+                .SetProperty("MoonPlanetName", planetName);
 
                 MyPlanetMoonItem item = new MyPlanetMoonItem();
                 item.Type = SystemObjectType.MOON;
